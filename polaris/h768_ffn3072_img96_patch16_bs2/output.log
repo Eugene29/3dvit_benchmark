@@ -1,0 +1,149 @@
+<--------------------------- Bash Arguments --------------------------->
+PBS_O_WORKDIR: 395474PBS_O_WORKDIR
+PYTHONPATH: /home/eku/MONAI:/opt/cray/pe/python/3.11.5:/soft/xalt/3.0.2-202408282050/site_packages
+echo PBS_NODEFILE: /var/spool/pbs/aux/2085822.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov
+cat PBS_NODEFILE: x3002c0s13b1n0.hsn.cm.polaris.alcf.anl.gov
+MASTER NODE x3002c0s13b1n0.hsn.cm.polaris.alcf.anl.gov :: MASTER_ADDR 10.201.1.83
+NUM_OF_NODES= 1 TOTAL_NUM_RANKS= 2 RANKS_PER_NODE= 2
+Python 3.11.8
+Torch version: 2.3.0
+Executing command: mpiexec -n 2 -ppn 2 python ../pp_test.py     --h_dim 768    --ffn_size 3072    --img_dim 96    --patch_dim 16    --bs 2
+
+
+
+
+<------------------------ Train Script Log ------------------------->
+2024-09-11 18:41:52.994606: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+2024-09-11 18:41:52.994594: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:
+    PyTorch 2.3.0+cu121 with CUDA 1201 (you have 2.3.0)
+    Python  3.11.9 (you have 3.11.8)
+  Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)
+  Memory-efficient attention, SwiGLU, sparse and more won't be available.
+  Set XFORMERS_MORE_DETAILS=1 for more details
+WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:
+    PyTorch 2.3.0+cu121 with CUDA 1201 (you have 2.3.0)
+    Python  3.11.9 (you have 3.11.8)
+  Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)
+  Memory-efficient attention, SwiGLU, sparse and more won't be available.
+  Set XFORMERS_MORE_DETAILS=1 for more details
+/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/autograd/graph.py:744: UserWarning: Grad strides do not match bucket view strides. This may indicate grad was not created according to the gradient layout contract, or that the param's strides changed since DDP was constructed.  This is not an error, but may impair performance.
+grad.sizes() = [16, 1, 4, 4, 4], strides() = [64, 1, 16, 4, 1]
+bucket_view.sizes() = [16, 1, 4, 4, 4], strides() = [64, 64, 16, 4, 1] (Triggered internally at /soft/applications/conda/2024-04-29/pytorch/torch/csrc/distributed/c10d/reducer.cpp:325.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/autograd/graph.py:744: UserWarning: Grad strides do not match bucket view strides. This may indicate grad was not created according to the gradient layout contract, or that the param's strides changed since DDP was constructed.  This is not an error, but may impair performance.
+grad.sizes() = [16, 1, 4, 4, 4], strides() = [64, 1, 16, 4, 1]
+bucket_view.sizes() = [16, 1, 4, 4, 4], strides() = [64, 64, 16, 4, 1] (Triggered internally at /soft/applications/conda/2024-04-29/pytorch/torch/csrc/distributed/c10d/reducer.cpp:325.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+STAGE:2024-09-11 18:41:58 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:41:58 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+[rank0]:[W CPUAllocator.cpp:249] Memory block of unknown size was allocated before the profiling started, profiler results will not include the deallocation event
+[rank1]:[W CPUAllocator.cpp:249] Memory block of unknown size was allocated before the profiling started, profiler results will not include the deallocation event
+STAGE:2024-09-11 18:41:58 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:41:58 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:41:58 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:41:58 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:02 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:02 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:02 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:02 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:02 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:02 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:06 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:06 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:06 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:06 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:06 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:06 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:06 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:06 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:07 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:07 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:07 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:07 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:10 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:10 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:11 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:11 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:11 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:11 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:15 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:15 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:15 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:15 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:15 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:15 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:15 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:15 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:15 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:15 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:15 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:15 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:19 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:19 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:20 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:20 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:20 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:20 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:23 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:23 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:23 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:23 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:23 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:23 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:24 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:24 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:24 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:24 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:24 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:24 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:28 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:28 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:28 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:28 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:28 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:28 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:32 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:32 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:32 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:32 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:32 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:32 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:33 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:33 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:33 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:33 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:33 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:33 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:37 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:37 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:37 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:37 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:37 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:37 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:41 395598:395598 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:41 395597:395597 ActivityProfilerController.cpp:314] Completed Stage: Warm Up
+STAGE:2024-09-11 18:42:41 395597:395597 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:41 395598:395598 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-09-11 18:42:41 395597:395597 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+STAGE:2024-09-11 18:42:41 395598:395598 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+RANK INFO: 1
+
+
+
+
+
+<------------------------ Result ------------------------->
+RANK INFO: 0
+world_size: 2
+arguments: {'epochs': 5, 'batch_size': 10, 'base_lr': 0.0005, 'seed': 19, 'deterministic': False, 'h_dim': 768, 'ffn_size': 3072, 'img_dim': 96, 'patch_dim': 16, 'bs': 2}
+data size: (2, 1, 96, 96, 96)
+trace_file location: bs2_ch1_img96_patch16
+number of params: 117467409
+Training Begins ...
+Avg Time per step for epoch:0= 0.9478368759155273 	Thoughput in samples/sec = 2.110067724541921 	mem used : 2659MB
+Avg Time per step for epoch:1= 0.8456462383270263 	Thoughput in samples/sec = 2.3650551606031796 	mem used : 2661MB
+Avg Time per step for epoch:2= 0.8643485069274902 	Thoughput in samples/sec = 2.3138814771710816 	mem used : 2661MB
+Avg Time per step for epoch:3= 0.9016811847686768 	Thoughput in samples/sec = 2.218078888396782 	mem used : 2661MB
+Avg Time per step for epoch:4= 0.8793198347091675 	Thoughput in samples/sec = 2.274485256734251 	mem used : 2661MB
+Done

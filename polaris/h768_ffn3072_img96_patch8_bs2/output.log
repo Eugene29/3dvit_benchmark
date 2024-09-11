@@ -1,0 +1,97 @@
+<--------------------------- Bash Arguments --------------------------->
+PBS_O_WORKDIR: 395151PBS_O_WORKDIR
+PYTHONPATH: /home/eku/MONAI:/opt/cray/pe/python/3.11.5:/soft/xalt/3.0.2-202408282050/site_packages
+echo PBS_NODEFILE: /var/spool/pbs/aux/2085822.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov
+cat PBS_NODEFILE: x3002c0s13b1n0.hsn.cm.polaris.alcf.anl.gov
+MASTER NODE x3002c0s13b1n0.hsn.cm.polaris.alcf.anl.gov :: MASTER_ADDR 10.201.1.77
+NUM_OF_NODES= 1 TOTAL_NUM_RANKS= 2 RANKS_PER_NODE= 2
+Python 3.11.8
+Torch version: 2.3.0
+Executing command: mpiexec -n 2 -ppn 2 python ../pp_test.py     --h_dim 768    --ffn_size 3072    --img_dim 96    --patch_dim 8    --bs 2
+
+
+
+
+<------------------------ Train Script Log ------------------------->
+2024-09-11 18:41:32.367339: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+2024-09-11 18:41:32.367338: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:
+    PyTorch 2.3.0+cu121 with CUDA 1201 (you have 2.3.0)
+    Python  3.11.9 (you have 3.11.8)
+  Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)
+  Memory-efficient attention, SwiGLU, sparse and more won't be available.
+  Set XFORMERS_MORE_DETAILS=1 for more details
+WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:
+    PyTorch 2.3.0+cu121 with CUDA 1201 (you have 2.3.0)
+    Python  3.11.9 (you have 3.11.8)
+  Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)
+  Memory-efficient attention, SwiGLU, sparse and more won't be available.
+  Set XFORMERS_MORE_DETAILS=1 for more details
+/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/modules/loss.py:101: UserWarning: Using a target size (torch.Size([2, 1, 96, 96, 96])) that is different to the input size (torch.Size([2, 1, 48, 48, 48])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  return F.l1_loss(input, target, reduction=self.reduction)
+
+
+
+
+
+<------------------------ Result ------------------------->
+RANK INFO: 0
+world_size: 2
+arguments: {'epochs': 5, 'batch_size': 10, 'base_lr': 0.0005, 'seed': 19, 'deterministic': False, 'h_dim': 768, 'ffn_size': 3072, 'img_dim': 96, 'patch_dim': 8, 'bs': 2}
+data size: (2, 1, 96, 96, 96)
+trace_file location: bs2_ch1_img96_patch8
+number of params: 115187089
+Training Begins ...
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/eku/3dvit_benchmarkscripts/polaris/h768_ffn3072_img96_patch8_bs2/../pp_test.py", line 216, in <module>
+[rank0]:     main(args)
+[rank0]:   File "/home/eku/3dvit_benchmarkscripts/polaris/h768_ffn3072_img96_patch8_bs2/../pp_test.py", line 195, in main
+[rank0]:     train_epoch(epoch, data_size, model, optimizer, loss_funcs)
+[rank0]:   File "/home/eku/3dvit_benchmarkscripts/polaris/h768_ffn3072_img96_patch8_bs2/../pp_test.py", line 110, in train_epoch
+[rank0]:     r_loss = loss_funcs[0](outputs_v1, gt_input)
+[rank0]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1532, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1541, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/modules/loss.py", line 101, in forward
+[rank0]:     return F.l1_loss(input, target, reduction=self.reduction)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/functional.py", line 3335, in l1_loss
+[rank0]:     expanded_input, expanded_target = torch.broadcast_tensors(input, target)
+[rank0]:                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/functional.py", line 76, in broadcast_tensors
+[rank0]:     return _VF.broadcast_tensors(tensors)  # type: ignore[attr-defined]
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]: RuntimeError: The size of tensor a (48) must match the size of tensor b (96) at non-singleton dimension 4
+/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/modules/loss.py:101: UserWarning: Using a target size (torch.Size([2, 1, 96, 96, 96])) that is different to the input size (torch.Size([2, 1, 48, 48, 48])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  return F.l1_loss(input, target, reduction=self.reduction)
+RANK INFO: 1
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/eku/3dvit_benchmarkscripts/polaris/h768_ffn3072_img96_patch8_bs2/../pp_test.py", line 216, in <module>
+[rank1]:     main(args)
+[rank1]:   File "/home/eku/3dvit_benchmarkscripts/polaris/h768_ffn3072_img96_patch8_bs2/../pp_test.py", line 195, in main
+[rank1]:     train_epoch(epoch, data_size, model, optimizer, loss_funcs)
+[rank1]:   File "/home/eku/3dvit_benchmarkscripts/polaris/h768_ffn3072_img96_patch8_bs2/../pp_test.py", line 110, in train_epoch
+[rank1]:     r_loss = loss_funcs[0](outputs_v1, gt_input)
+[rank1]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1532, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1541, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/modules/loss.py", line 101, in forward
+[rank1]:     return F.l1_loss(input, target, reduction=self.reduction)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/nn/functional.py", line 3335, in l1_loss
+[rank1]:     expanded_input, expanded_target = torch.broadcast_tensors(input, target)
+[rank1]:                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/soft/applications/conda/2024-04-29/mconda3/lib/python3.11/site-packages/torch/functional.py", line 76, in broadcast_tensors
+[rank1]:     return _VF.broadcast_tensors(tensors)  # type: ignore[attr-defined]
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]: RuntimeError: The size of tensor a (48) must match the size of tensor b (96) at non-singleton dimension 4
+x3002c0s13b1n0.hsn.cm.polaris.alcf.anl.gov: rank 0 exited with code 1
+Done
