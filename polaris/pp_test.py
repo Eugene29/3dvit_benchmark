@@ -13,7 +13,7 @@ from utils import collate_fn, reduce_tensor
 from timm.utils import AverageMeter
 import numpy as np
 import time
-from pprint import pprint
+
 comm = MPI.COMM_WORLD
 comm.Barrier()
 world_size = comm.Get_size()
