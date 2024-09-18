@@ -1,3 +1,3 @@
 [submodule "MONAI"]
 	path = MONAI
-	url = git@github.com:Eugene29/MONAI_3dvit.git
+	url = https://github.com/Eugene29/MONAI_3dvit.git
