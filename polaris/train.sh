@@ -1,17 +1,21 @@
 #!/bin/sh
-
 module use /soft/modulefiles
 module load conda
-conda activate base
+# conda activate base
+. ~/venv/stable/bin/activate ## conda + fvcore
 
 MONAI_DIR=$HOME
 DEBUG=${DEBUG:-0}
-# MONAI_DIR=$(dirname $PBS_O_WORKDIR)
+NNODES=$(wc -l < $PBS_NODEFILE)
+SEQ_LEN=$((($IMG_DIM / $PATCH_DIM) ** 3))
+echo "Training with NNODES=${NNODES} H_DIM=$H_DIM FFN_SIZE=$FFN_SIZE IMG_DIM=$IMG_DIM PATCH_DIM=$PATCH_DIM BS=$BS CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-"all"}"
+echo "Sequence-Length (assuming cubic img and patch dim): $SEQ_LEN"
 
 ## If Not DEBUG, SET-UP output folder and output.log
 if [ $DEBUG -eq 0 ]; then
     DIR=$(dirname $0)
-    PBS_O_WORKDIR="$DIR/h${H_DIM}_ffn${FFN_SIZE}_img${IMG_DIM}_patch${PATCH_DIM}_bs${BS}"
+    PBS_O_WORKDIR="$DIR/n${NNODES}_h${H_DIM}_ffn${FFN_SIZE}_img${IMG_DIM}_patch${PATCH_DIM}_bs${BS}"
+    LOG_NAME="n${NNODES}_h${H_DIM}_ffn${FFN_SIZE}_img${IMG_DIM}_patch${PATCH_DIM}_bs${BS}"
     mkdir -p $PBS_O_WORKDIR
     exec &> $PBS_O_WORKDIR/output.log
     FNAME=../pp_test.py
@@ -54,9 +58,13 @@ export MASTER_ADDR=$(host $master_node | head -1 | awk '{print $4}')
 echo "MASTER NODE ${master_node} :: MASTER_ADDR ${MASTER_ADDR}"
 export MASTER_PORT=29500
 
-export NNODES=$(wc -l < $PBS_NODEFILE)
+export NNODES=$NNODES
 export CUDA_LAUNCH_BLOCKING=1
-export NRANKS_PER_NODE=$(echo $CUDA_VISIBLE_DEVICES | tr ',' "\n" | wc -l | cat) ## num GPUs Visible
+if [ -z $CUDA_VISIBLE_DEVICES ]; then
+    export NRANKS_PER_NODE=4
+else
+    export NRANKS_PER_NODE=$(echo $CUDA_VISIBLE_DEVICES | tr ',' "\n" | wc -l | cat) ## num GPUs Visible
+fi
 NTOTRANKS=$(( NNODES * NRANKS_PER_NODE ))
 echo "NUM_OF_NODES= ${NNODES} TOTAL_NUM_RANKS= ${NTOTRANKS} RANKS_PER_NODE= ${NRANKS_PER_NODE}"
 ulimit -s unlimited
@@ -71,12 +79,19 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 # NTOTRANKS=1
 
 ## ARGS
+if ((WANDB == 1)); then
+    WANDB="--use_wandb"
+else
+    WANDB=""
+fi
 VIT_ARGS="\
     --h_dim ${H_DIM:-768}\
     --ffn_size ${FFN_SIZE:-3072}\
     --img_dim ${IMG_DIM:-96}\
     --patch_dim ${PATCH_DIM:-16}\
     --bs ${BS:-4}\
+    --log_name $LOG_NAME\
+    $WANDB \
 "
 
 ## RUN CMD
