@@ -222,9 +222,9 @@ def main(args):
 
     ## Log
     avg_samples_per_sec = sum(samples_per_secs[1:]) / len(samples_per_secs[1:])
-    max_memory_used = torch.cuda.max_memory_allocated() / (1000**3)
+    max_memory_used = torch.cuda.max_memory_allocated() / (1024**3)
     avg_tflops = sum(tflops_lst[1:]) / len(tflops_lst[1:])
-    result = {"avg_samples_per_sec (per GPU)": avg_samples_per_sec, "max_memory (GB)": max_memory_used, "avg TFlops (per GPU)": avg_tflops}
+    result = {"avg_samples_per_sec (per GPU)": avg_samples_per_sec, "max_memory (GiB)": max_memory_used, "avg TFlops (per GPU)": avg_tflops}
     if args.use_wandb and rank==0:
         wandb.log(result)
     print_rank_0(result)

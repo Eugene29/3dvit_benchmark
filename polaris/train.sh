@@ -15,23 +15,16 @@ IMG_DIM=${IMG_DIM:-96}
 PATCH_DIM=${PATCH_DIM:-16}
 BS=${BS:-4}
 
-# DEBUG=${DEBUG:-0} ## Turns off logging
+
+## SETUP VARS
 NNODES=$(wc -l < $PBS_NODEFILE)
 SEQ_LEN=$((($IMG_DIM / $PATCH_DIM) ** 3)) ## assuming cubic img and patch dim
-
-## If Not DEBUG, SET-UP output folder and output.log
-# if [ $DEBUG -eq 0 ]; then
 DIR=$(dirname $0)
 LOGNAME="h${H_DIM}_ffn${FFN_SIZE}_img${IMG_DIM}_patch${PATCH_DIM}_bs${BS}"
-PBS_O_WORKDIR="$DIR/${NNODES}_node/$LOGNAME" ##Q. Why does everybody use this?
-# FNAME=../pp_test.py
+PBS_O_WORKDIR="$DIR/${NNODES}_node/$LOGNAME" ##Q. Why does everybody use PBS_O_WORKDIR?
 MONAI_DIR=$(dirname $DIR)/MONAI
-# else
-#     PBS_O_WORKDIR=$(dirname $0)
-#     FNAME=pp_test.py
-# fi
 
-echo -e "Training Hyper-parameters:
+echo -e "Training with Hyper-parameters:
     NNODES=${NNODES}
     H_DIM=$H_DIM
     FFN_SIZE=$FFN_SIZE
@@ -49,16 +42,6 @@ export CUDNN_PATH=/soft/libraries/cudnn/cudnn-cuda12-linux-x64-v9.1.0.70/
 export CPATH=$CUDNN_PATH/include:$CPATH
 export CC=gcc-12
 export CXX=g++-12
-
-
-cd $PBS_O_WORKDIR
-## Save for Aurora
-#export HTTP_PROXY=http://proxy.alcf.anl.gov:3128
-#export HTTPS_PROXY=http://proxy.alcf.anl.gov:3130
-#export http_proxy=http://proxy.alcf.anl.gov:3128
-#export https_proxy=http://proxy.alcf.anl.gov:3128
-#git config --global http.proxy http://proxy.alcf.anl.gov:3128
-#echo "Set HTTP_PROXY and to $HTTP_PROXY"
 
 ## Curious to know more about these:
 export NCCL_CROSS_NIC=1 
@@ -96,7 +79,7 @@ echo "PBS_NODEFILE: $(cat $PBS_NODEFILE)"
 python --version
 echo "Torch version: $(python -c 'import torch; print(torch.__version__)')"
 echo "MASTER NODE ${master_node} :: MASTER_ADDR ${MASTER_ADDR}"
-echo "NUM_OF_NODES= ${NNODES} TOTAL_NUM_RANKS= ${NTOTRANKS} RANKS_PER_NODE= ${NRANKS_PER_NODE}"
+echo "NUM_OF_NODES= ${NNODES} TOTAL_NUM_RANKS=${NTOTRANKS} RANKS_PER_NODE=${NRANKS_PER_NODE}"
 ulimit -s unlimited
 
 
@@ -106,8 +89,7 @@ ulimit -s unlimited
 # NTOTRANKS=1
 
 ## PYSCRIPT ARGS
-WANDB=""
-if ((WANDB == 1)); then
+if [ -n WANDB ]; then
     WANDB="--use_wandb"
 fi
 VIT_ARGS="\
@@ -125,10 +107,7 @@ run_cmd="mpiexec -n $NTOTRANKS -ppn $NRANKS_PER_NODE python ../../pp_test.py $VI
 echo "Executing command: $run_cmd"
 printf "\n\n\n\n"
 echo "<------------------------ Train Script Log ------------------------->"
+cd $PBS_O_WORKDIR
 eval $run_cmd
-
-#mpiexec -n $NTOTRANKS -ppn $NRANKS_PER_NODE python mgpu_ssl_train_random_profile.py \
-#mpiexec -n 1 -ppn $NRANKS_PER_NODE python mgpu_ssl_train_random_profile.py \
-#   --epochs 10 --batch_size 2 --data_root /eagle/datascience/vsastry/Vit_Pipeline/tutorials/self_supervised_pretraining/vit_unetr_ssl/multi_gpu/Covid_data  --json_path /eagle/datascience/vsastry/Vit_Pipeline/tutorials/self_supervised_pretraining/vit_unetr_ssl/datalists/tcia/dataset_split_new.json --logdir_path ./ 
 cd ..
 echo "Done"
