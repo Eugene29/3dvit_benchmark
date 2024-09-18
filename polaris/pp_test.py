@@ -20,9 +20,6 @@ comm = MPI.COMM_WORLD
 comm.Barrier()
 world_size = comm.Get_size()
 rank = comm.Get_rank()
-def print_rank_0(msg: str):
-    if rank == 0:
-        print(msg)
 device_count = torch.cuda.device_count()
 
 if torch.cuda.is_available():
@@ -35,6 +32,10 @@ my_schedule = schedule(
     active=3,
     repeat=2)
 device = 'cuda'
+
+def print_rank_0(msg: str):
+    if rank == 0:
+        print(msg)
 
 def parse_option():
     parser = argparse.ArgumentParser("ViT Self-Supervised Learning", add_help=False)
@@ -88,7 +89,7 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs
     loss_meter = AverageMeter()
     batch_time = AverageMeter()
     n_steps = 10
-    profile_step = 5
+    profile_step = 5 ## deepspeed flop counter
 
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, profile_memory=True,

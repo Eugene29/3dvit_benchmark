@@ -1,20 +1,19 @@
 #!/bin/sh
 
-## EXAMPLE USE: H_DIM=768 FFN_SIZE=3072 IMG_DIM=96 PATCH_DIM=4 BS=4 bash train.sh
-## For default params: bash train.sh
+## EXAMPLE USE: 
+## H_DIM=768 FFN_SIZE=3072 IMG_DIM=96 PATCH_DIM=4 BS=4 bash train.sh
+## DEFAULT RUN: bash train.sh
 
 module use /soft/modulefiles
 module load conda
 conda activate base
-# . ~/venv/stable/bin/activate ## conda + fvcore
 
-## DEFAULT_PARAMS
+## DEFAULT PARAMS
 H_DIM=${H_DIM:-768}
 FFN_SIZE=${FFN_SIZE:-3072}
 IMG_DIM=${IMG_DIM:-96}
 PATCH_DIM=${PATCH_DIM:-16}
 BS=${BS:-4}
-
 
 ## SETUP VARS
 NNODES=$(wc -l < $PBS_NODEFILE)
@@ -33,10 +32,10 @@ echo -e "Training with Hyper-parameters:
     BS=$BS
     CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-'all'}
 Output Log and Trace File at: $PBS_O_WORKDIR \n"
-
 mkdir -p $PBS_O_WORKDIR
 exec &> $PBS_O_WORKDIR/output.log
 
+## Curious to know more about these:
 export PYTHONPATH="$MONAI_DIR:$PYTHONPATH"
 export CUDNN_PATH=/soft/libraries/cudnn/cudnn-cuda12-linux-x64-v9.1.0.70/
 export CPATH=$CUDNN_PATH/include:$CPATH
@@ -52,6 +51,14 @@ export LD_LIBRARY_PATH=/soft/libraries/hwloc/lib/:$LD_LIBRARY_PATH
 export FI_CXI_DISABLE_HOST_REGISTER=1 
 export FI_MR_CACHE_MONITOR=userfaultfd 
 export FI_CXI_DEFAULT_CQ_SIZE=131072
+
+## Save for Aurora
+#export HTTP_PROXY=http://proxy.alcf.anl.gov:3128
+#export HTTPS_PROXY=http://proxy.alcf.anl.gov:3130
+#export http_proxy=http://proxy.alcf.anl.gov:3128
+#export https_proxy=http://proxy.alcf.anl.gov:3128
+#git config --global http.proxy http://proxy.alcf.anl.gov:3128
+#echo "Set HTTP_PROXY and to $HTTP_PROXY"
 
 # set master address to the first host
 master_node=$(head -1 $PBS_NODEFILE)
@@ -83,7 +90,7 @@ echo "NUM_OF_NODES= ${NNODES} TOTAL_NUM_RANKS=${NTOTRANKS} RANKS_PER_NODE=${NRAN
 ulimit -s unlimited
 
 
-## 1GPU Debug Mode
+## 1 GPU Debug Mode
 # export CUDA_VISIBLE_DEVICES=0
 # export NRANKS_PER_NODE=1
 # NTOTRANKS=1
@@ -105,8 +112,7 @@ VIT_ARGS="\
 ## RUN CMD
 run_cmd="mpiexec -n $NTOTRANKS -ppn $NRANKS_PER_NODE python ../../pp_test.py $VIT_ARGS"
 echo "Executing command: $run_cmd"
-printf "\n\n\n\n"
-echo "<------------------------ Train Script Log ------------------------->"
+printf "\n\n\n\n<------------------------ Train Script Log ------------------------->"
 cd $PBS_O_WORKDIR
 eval $run_cmd
 cd ..

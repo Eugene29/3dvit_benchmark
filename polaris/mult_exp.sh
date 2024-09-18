@@ -7,6 +7,10 @@ export WANDB=1
 ## SET UP FOR NODES=1 ##
 ########################
 
+########################
+## SET UP FOR NODES=1 ##
+########################
+
 # ##
 # H_DIM=768 FFN_SIZE=3072 IMG_DIM=96 PATCH_DIM=4 BS=4 bash $DIR/train.sh
 # H_DIM=768 FFN_SIZE=3072 IMG_DIM=96 PATCH_DIM=4 BS=8 bash $DIR/train.sh

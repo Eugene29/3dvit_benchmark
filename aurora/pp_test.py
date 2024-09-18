@@ -14,13 +14,14 @@ from torch.nn import L1Loss
 from utils import collate_fn, reduce_tensor
 from timm.utils import AverageMeter
 import time
+from deepspeed.profiling.flops_profiler import FlopsProfiler
+import numpy as np
+
 comm = MPI.COMM_WORLD
 comm.Barrier()
 world_size = comm.Get_size()
 rank = comm.Get_rank()
-print("RANK INFO:")
-print(world_size)
-print(rank)
+
 if rank == 0:
    master_addr              = socket.gethostname()
    sock                     = socket.socket()
@@ -48,7 +49,7 @@ def get_default_device():
         return torch.device('cpu')
 
 device  = get_default_device()
-print(f"########### device :{device}")
+# print(f"########### device :{device}")
 my_schedule = schedule(
     skip_first=10,
     wait=5,
@@ -58,6 +59,10 @@ my_schedule = schedule(
 
 device = 'xpu'
 
+def print_rank_0(msg: str):
+    if rank == 0:
+        print(msg)
+        
 def parse_option():
     parser = argparse.ArgumentParser("ViT Self-Supervised Learning", add_help=False)
 
@@ -82,23 +87,38 @@ def parse_option():
     parser.add_argument("--epochs", default=5, type=int, help="number of epochs")
     parser.add_argument("--batch_size", default=10, type=int, help="batch size for single GPU")
     parser.add_argument("--base_lr", default=5e-4, type=float, help="base learning rate")
-
     parser.add_argument("--seed", default=19, type=int, help="seed")
     parser.add_argument("--deterministic", help="set seed for deterministic training", action="store_true")
+
+    ## EK
+    parser.add_argument("--h_dim", type=int, default=768, help="patch embedding size likely?")
+    parser.add_argument("--ffn_size", type=int, default=3072, help="feedforward neural network size")
+    parser.add_argument("--img_dim", type=int, default=96, help="image size (cubed)")
+    parser.add_argument("--patch_dim", type=int, default=16, help="patch size (cubed)")
+    parser.add_argument("--bs", type=int, default=4, help="global batch size")
+    parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--run_name", type=str)
     args = parser.parse_args()
     return args
 
 
 def trace_handler(p):
     output = p.key_averages().table(sort_by="self_xpu_time_total", row_limit=10)
-    p.export_chrome_trace("./trace_vit/trace_" + f"{trace_file_prefix}_step" +  str(p.step_num) + ".json")
+    os.makedirs("./trace_vit/", exist_ok=True)
+    if rank == 0: ## avoid race condition error
+        p.export_chrome_trace("./trace_vit/trace_" + f"{trace_file_prefix}_step" +  str(p.step_num) + ".json")
     #print(output)
-def train_epoch(epoch, data_size, model, optimizer, loss_funcs):
+
+# def train_epoch(epoch, data_size, model, optimizer, loss_funcs):
+def train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs, tflops_lst, prof):
     loss_l1_meter = AverageMeter()
     loss_cont_meter = AverageMeter()
     loss_meter = AverageMeter()
     batch_time = AverageMeter()
     n_steps = 10
+    profile_step = 5 ## deepspeed flop counter
+    print_rank_0(f"\n\n\n\nEpoch: {epoch}")
+
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.XPU], record_shapes=True, profile_memory=True,
         with_stack=True, schedule=torch.profiler.schedule(
@@ -107,6 +127,8 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs):
             active=2),
         on_trace_ready=trace_handler) as p:
         for idx in range(n_steps):
+            if idx == profile_step:
+                prof.start_profile()
             b_start = time.time()
             inputs = torch.randn(data_size, device=device)
             inputs_2 = torch.randn(data_size, device=device)
@@ -130,9 +152,21 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs):
             optimizer.step()
             p.step()
         
-            r_loss_t = r_loss #reduce_tensor(r_loss)
-            cl_loss_t = cl_loss #reduce_tensor(cl_loss)
-            total_loss_t = total_loss #reduce_tensor(total_loss)
+            # end profiling and print output
+            if idx == profile_step: # if using multi nodes, check global_rank == 0 as well
+                prof.stop_profile()
+                total_flops = prof.get_total_flops()
+                macs = prof.get_total_macs()
+                params = prof.get_total_params()
+                prof.print_model_profile(profile_step=profile_step, detailed=False)
+                flops = total_flops / prof.get_total_duration() / (1000**4)
+                prof.end_profile()
+                print_rank_0(f"TFlops: {flops}")
+                tflops_lst.append(flops)
+
+            r_loss_t = reduce_tensor(r_loss)
+            cl_loss_t = reduce_tensor(cl_loss)
+            total_loss_t = reduce_tensor(total_loss)
 
             loss_l1_meter.update(r_loss_t.item(), inputs.size(0))
             loss_cont_meter.update(cl_loss_t.item(), inputs.size(0))
@@ -140,7 +174,6 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs):
             bt = time.time() - b_start
             batch_time.update(bt)
             lr = optimizer.param_groups[0]["lr"]
-            memory_used = torch.xpu.max_memory_allocated() / (1024.0 * 1024.0)
             """
             etas = batch_time.avg * (num_steps - idx)
             print(
@@ -153,53 +186,88 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs):
                 f"mem {memory_used:.0f}MB"
             )
             """
-        print(f"Avg Time per step for epoch:{epoch}= {batch_time.avg} \t"
-              f"Thoughput in samples/sec = {(data_size[0]*n_steps)/batch_time.sum} \t"
-              f"mem used : {memory_used:.0f}MB")
+        samples_per_sec = (data_size[0]*n_steps)/batch_time.sum
+        samples_per_secs.append(samples_per_sec)
+        # print(f"Avg Time per step for epoch:{epoch}= {batch_time.avg} \t"
+        #       f"Thoughput in samples/sec = {(data_size[0]*n_steps)/batch_time.sum} \t"
+        #       f"mem used : {memory_used:.0f}MB")
 trace_file_prefix = ""
 def main(args):
-    device = 'xpu'
-    img_size = (96, 96, 96)
-    patch_size = (16, 16, 16)
+    bs, img_dim, patch_dim, h_dim, ffn_size = args.bs, args.img_dim, args.patch_dim, args.h_dim, args.ffn_size
+    assert args.bs % world_size == 0, "Batch size not divisible by DP RANK"
+    bs = bs // world_size
     n_channels = 1
-    bs = 32
+    img_size = (img_dim, img_dim, img_dim) ## Cubed
+    patch_size = (patch_dim, patch_dim, patch_dim) ## Cubed
     data_size = (bs,n_channels,img_size[0],img_size[1],img_size[2])
-    print(data_size)
-    global trace_file_prefix 
+    global trace_file_prefix
     trace_file_prefix = f"bs{bs}_ch{n_channels}_img{img_size[0]}_patch{patch_size[0]}"
-    print(f"trace_file: {trace_file_prefix}")
+
+    print_rank_0(f"\n\n\n\n<------------------------ Result ------------------------->")
+    print_rank_0(f"world_size: {world_size}")
+    print_rank_0(f"pyscript arguments: {vars(args)}")
+    print_rank_0(f"data size: {data_size}")
+    print_rank_0(f"trace_file_prefix: {trace_file_prefix}")
+    print(f"RANK INFO: {rank}")
+
+    ## Init Model
     model = ViTAutoEnc(
         in_channels=n_channels,
         img_size=img_size,
         patch_size=patch_size,
-        pos_embed="conv",
-        hidden_size=768,
-        mlp_dim=3072,
+        # pos_embed="conv", ##Q. This argument is not used, deprecated for proj_type?
+        proj_type="conv",
+        hidden_size=h_dim,
+        mlp_dim=ffn_size,
     ).xpu()
     model = torch.nn.parallel.DistributedDataParallel(
         model, device_ids=[rank%device_count], broadcast_buffers=False, find_unused_parameters=True
     )
-    model_without_ddp = model.module
+    # model_without_ddp = model.module
     #data_size = (2,1,96,96,96)
     recon_loss = L1Loss()
     contrastive_loss = ContrastiveLoss(temperature=0.05)
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
     loss_funcs = [recon_loss, contrastive_loss]
-    loss_l1_meter = AverageMeter()
-    loss_cont_meter = AverageMeter()
-    loss_meter = AverageMeter()
-    batch_time = AverageMeter()
+    samples_per_secs, tflops_lst = [], []
+    # loss_l1_meter = AverageMeter()
+    # loss_cont_meter = AverageMeter()
+    # loss_meter = AverageMeter()
+    # batch_time = AverageMeter()
     
+    ## Train
+    prof = FlopsProfiler(model)
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print("number of params: {}".format(n_parameters))
-    print("Training Begins ...")
-    
+    print_rank_0("number of params: {}".format(n_parameters))
+    print_rank_0("Training Begins ...")
+
     for epoch in range(args.epochs):
-        train_epoch(epoch, data_size, model, optimizer, loss_funcs)
+        train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs, tflops_lst, prof)
+
+    ## Log
+    avg_samples_per_sec = sum(samples_per_secs[1:]) / len(samples_per_secs[1:])
+    max_memory_used = torch.xpu.max_memory_allocated() / (1024**3)
+    avg_tflops = sum(tflops_lst[1:]) / len(tflops_lst[1:])
+    result = {"avg_samples_per_sec (per GPU)": avg_samples_per_sec, "max_memory (GiB)": max_memory_used, "avg TFlops (per GPU)": avg_tflops}
+    # if args.use_wandb and rank==0:
+    #     wandb.log(result)
+    print_rank_0(result)
+    print_rank_0(f"samples_per_secs: {samples_per_secs}, tflops_lst: {tflops_lst}")
+
 
 if __name__ == "__main__":
     args = parse_option()
-    import oneccl_bindings_for_pytorch
+
+    # if args.use_wandb and rank==0:
+    #     import wandb
+    #     if args.run_name:
+    #         wandb.init(project="3dvit", name=args.run_name)
+    #         # wandb.init(project="3dvit", name=args.run_name, config=vars(args))
+    #     else:
+    #         wandb.init(project="3dvit")
+    #         # wandb.init(project="3dvit", config=vars(args))
+            
+    # import oneccl_bindings_for_pytorch
     torch.distributed.init_process_group(backend="ccl", init_method="env://", world_size=world_size, rank=rank)
     torch.distributed.barrier()
     seed = args.seed + dist.get_rank()
