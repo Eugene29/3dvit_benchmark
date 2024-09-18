@@ -14,6 +14,7 @@ from utils import collate_fn, reduce_tensor
 from timm.utils import AverageMeter
 import numpy as np
 import time
+from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 comm = MPI.COMM_WORLD
 comm.Barrier()
@@ -24,7 +25,6 @@ def print_rank_0(msg: str):
         print(msg)
 device_count = torch.cuda.device_count()
 
-# DEVICE_TYPE = ez.dist.get_torch_device_type()
 if torch.cuda.is_available():
     torch.cuda.set_device(rank % device_count)
 
@@ -60,7 +60,6 @@ def parse_option():
     parser.add_argument("--epochs", default=5, type=int, help="number of epochs")
     parser.add_argument("--batch_size", default=10, type=int, help="batch size for single GPU")
     parser.add_argument("--base_lr", default=5e-4, type=float, help="base learning rate")
-
     parser.add_argument("--seed", default=19, type=int, help="seed")
     parser.add_argument("--deterministic", help="set seed for deterministic training", action="store_true")
     
@@ -69,9 +68,9 @@ def parse_option():
     parser.add_argument("--ffn_size", type=int, default=3072, help="feedforward neural network size")
     parser.add_argument("--img_dim", type=int, default=96, help="image size (cubed)")
     parser.add_argument("--patch_dim", type=int, default=16, help="patch size (cubed)")
-    parser.add_argument("--bs", type=int, default=4, help="batch size")
+    parser.add_argument("--bs", type=int, default=4, help="global batch size")
     parser.add_argument("--use_wandb", action="store_true")
-    parser.add_argument("--log_name", type=str)
+    parser.add_argument("--run_name", type=str)
     args = parser.parse_args()
     return args
 
@@ -82,6 +81,7 @@ def trace_handler(p):
     if rank == 0: ## avoid race condition error
         p.export_chrome_trace("./trace_vit/trace_" + f"{trace_file_prefix}_step" +  str(p.step_num) + ".json")
     #print(output)
+
 def train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs, tflops_lst, prof):
     loss_l1_meter = AverageMeter()
     loss_cont_meter = AverageMeter()
@@ -160,21 +160,15 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs
                 f"mem {memory_used:.0f}MB"
             )
             """
-        memory_used = torch.cuda.max_memory_allocated() / (1024.0 * 1024.0)
+        # memory_used = torch.cuda.max_memory_allocated() / (1024.0 * 1024.0)
         samples_per_sec = (data_size[0]*n_steps)/batch_time.sum
         samples_per_secs.append(samples_per_sec)
-        print_rank_0(f"Avg Time per step for epoch:{epoch}= {batch_time.avg} \t"
-              f"Thoughput in samples/sec = {samples_per_sec} \t"
-              f"mem used : {memory_used:.0f}MB")
+        # print_rank_0(f"Avg Time per step for epoch:{epoch}= {batch_time.avg} \t"
+        #       f"Thoughput in samples/sec = {samples_per_sec} \t"
+        #       f"mem used : {memory_used:.0f}MiB")
 trace_file_prefix = ""
 
 def main(args):
-    print_rank_0(f"\n\n\n\n")
-    print_rank_0(f"<------------------------ Result ------------------------->")
-    print(f"RANK INFO: {rank}")
-    print_rank_0(f"world_size: {world_size}")
-    print_rank_0(f"arguments: {vars(args)}")
-
     bs, img_dim, patch_dim, h_dim, ffn_size = args.bs, args.img_dim, args.patch_dim, args.h_dim, args.ffn_size
     assert args.bs % world_size == 0, "Batch size not divisible by DP RANK"
     bs = bs // world_size
@@ -182,15 +176,22 @@ def main(args):
     img_size = (img_dim, img_dim, img_dim) ## Cubed
     patch_size = (patch_dim, patch_dim, patch_dim) ## Cubed
     data_size = (bs,n_channels,img_size[0],img_size[1],img_size[2])
-    print_rank_0(f"data size: {data_size}")
     global trace_file_prefix
     trace_file_prefix = f"bs{bs}_ch{n_channels}_img{img_size[0]}_patch{patch_size[0]}"
-    print_rank_0(f"trace_file location: {trace_file_prefix}")
+
+    print_rank_0(f"\n\n\n\n<------------------------ Result ------------------------->")
+    print_rank_0(f"world_size: {world_size}")
+    print_rank_0(f"pyscript arguments: {vars(args)}")
+    print_rank_0(f"data size: {data_size}")
+    print_rank_0(f"trace_file_prefix: {trace_file_prefix}")
+    print(f"RANK INFO: {rank}")
+
+    ## Init Model
     model = ViTAutoEnc(
         in_channels=n_channels,
         img_size=img_size,
         patch_size=patch_size,
-        # pos_embed="conv", ##Q. This argument is not used, mistake for proj_type?
+        # pos_embed="conv", ##Q. This argument is not used, deprecated for proj_type?
         proj_type="conv",
         hidden_size=h_dim,
         mlp_dim=ffn_size,
@@ -209,38 +210,33 @@ def main(args):
     # loss_meter = AverageMeter()
     # batch_time = AverageMeter()
     
+
+    ## Train
+    prof = FlopsProfiler(model)
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print_rank_0("number of params: {}".format(n_parameters))
     print_rank_0("Training Begins ...")
-    from deepspeed.profiling.flops_profiler import FlopsProfiler
-    prof = FlopsProfiler(model)
-    
 
     for epoch in range(args.epochs):
         train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs, tflops_lst, prof)
 
+    ## Log
     avg_samples_per_sec = sum(samples_per_secs[1:]) / len(samples_per_secs[1:])
     max_memory_used = torch.cuda.max_memory_allocated() / (1000**3)
-    # avg_flops = 0
-    # from fvcore.nn import FlopCountAnalysis, flop_count_table
-    # flops = FlopCountAnalysis(model, torch.randn(data_size, device=device))
-    # avg_flops = flops.total() * avg_samples_per_sec / 1024**4 ##Q. the flops.total() is per sample?
     avg_tflops = sum(tflops_lst[1:]) / len(tflops_lst[1:])
-    
     result = {"avg_samples_per_sec (per GPU)": avg_samples_per_sec, "max_memory (GB)": max_memory_used, "avg TFlops (per GPU)": avg_tflops}
-    # result = {"avg_samples_per_sec (Total)": avg_samples_per_sec, "max_memory (GB)": max_memory_used, "avg_flops (Total TFlops)": avg_flops}
     if args.use_wandb and rank==0:
         wandb.log(result)
     print_rank_0(result)
-    # print_rank_0(flop_count_table(flops))
+
 
 if __name__ == "__main__":
     args = parse_option()
 
     if args.use_wandb and rank==0:
         import wandb
-        if args.log_name:
-            wandb.init(project="3dvit", name=args.log_name)
+        if args.run_name:
+            wandb.init(project="3dvit", name=args.run_name)
         else:
             wandb.init(project="3dvit")
 
