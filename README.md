@@ -1,5 +1,5 @@
 ```
-git clone --recursive
+git clone --recursive https://github.com/Eugene29/3dvit_benchmark.git
 ```
 
 ```
