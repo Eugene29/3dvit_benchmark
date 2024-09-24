@@ -15,6 +15,8 @@ from timm.utils import AverageMeter
 import numpy as np
 import time
 from deepspeed.profiling.flops_profiler import FlopsProfiler
+from datetime import datetime
+import pytz
 
 comm = MPI.COMM_WORLD
 comm.Barrier()
@@ -59,7 +61,6 @@ def parse_option():
 
     # DL Training Hyper-parameters
     parser.add_argument("--epochs", default=5, type=int, help="number of epochs")
-    parser.add_argument("--batch_size", default=10, type=int, help="batch size for single GPU")
     parser.add_argument("--base_lr", default=5e-4, type=float, help="base learning rate")
     parser.add_argument("--seed", default=19, type=int, help="seed")
     parser.add_argument("--deterministic", help="set seed for deterministic training", action="store_true")
@@ -72,14 +73,24 @@ def parse_option():
     parser.add_argument("--bs", type=int, default=4, help="global batch size")
     parser.add_argument("--use_wandb", action="store_true")
     parser.add_argument("--run_name", type=str)
+    
     args = parser.parse_args()
+
+    args.seq_length = ( args.img_dim / args.patch_dim )**3
+
+    ct = pytz.timezone('America/Chicago')
+    ct_time = datetime.now(ct).strftime("_%m%d_%H%M")
+    args.wandb_name = args.run_name + ct_time
+
+    global trace_file_prefix
+    trace_file_prefix = args.run_name
     return args
 
 
 def trace_handler(p):
-    output = p.key_averages().table(sort_by="self_cuda_time_total", row_limit=10)
+    # output = p.key_averages().table(sort_by="self_cuda_time_total", row_limit=10)
     os.makedirs("./trace_vit/", exist_ok=True)
-    if rank == 0: ## avoid race condition error
+    if rank == 0: ## avoid race condition
         p.export_chrome_trace("./trace_vit/trace_" + f"{trace_file_prefix}_step" +  str(p.step_num) + ".json")
     #print(output)
 
@@ -94,9 +105,14 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, profile_memory=True,
         with_stack=True, schedule=torch.profiler.schedule(
-            wait=1,
-            warmup=1,
+            wait=0,
+            warmup=0,
             active=2),
+        # activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, profile_memory=True,
+        # with_stack=True, schedule=torch.profiler.schedule(
+        #     wait=1,
+        #     warmup=1,
+        #     active=2),
         on_trace_ready=trace_handler) as p:
         for idx in range(n_steps):
             if idx == profile_step:
@@ -128,9 +144,9 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs
             if idx == profile_step: # if using multi nodes, check global_rank == 0 as well
                 prof.stop_profile()
                 total_flops = prof.get_total_flops()
-                macs = prof.get_total_macs()
-                params = prof.get_total_params()
-                prof.print_model_profile(profile_step=profile_step, detailed=False)
+            #     macs = prof.get_total_macs()
+            #     params = prof.get_total_params()
+            #     prof.print_model_profile(profile_step=profile_step, detailed=False)
                 flops = total_flops / prof.get_total_duration() / (1000**4)
                 prof.end_profile()
                 print_rank_0(f"TFlops: {flops}")
@@ -167,8 +183,17 @@ def train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs
         # print_rank_0(f"Avg Time per step for epoch:{epoch}= {batch_time.avg} \t"
         #       f"Thoughput in samples/sec = {samples_per_sec} \t"
         #       f"mem used : {memory_used:.0f}MiB")
-trace_file_prefix = ""
 
+    # if torch.distributed.get_rank()==0:
+        # averages=p.key_averages()
+        # nccl_time = sum([event.self_cuda_time_total for event in averages if 'nccl' in event.name.lower()])
+        # print(f"averages: {averages}")
+        # print(f"nccl_time: {nccl_time}")
+
+        # key_averages = prof.key_averages()
+        # nccl_time = sum([event.self_cuda_time_total for event in key_averages if 'nccl' in event.name.lower()])
+        # print(f"NCCL Total Time: {nccl_time} microseconds")
+        
 def main(args):
     bs, img_dim, patch_dim, h_dim, ffn_size = args.bs, args.img_dim, args.patch_dim, args.h_dim, args.ffn_size
     assert args.bs % world_size == 0, "Batch size not divisible by DP RANK"
@@ -177,14 +202,11 @@ def main(args):
     img_size = (img_dim, img_dim, img_dim) ## Cubed
     patch_size = (patch_dim, patch_dim, patch_dim) ## Cubed
     data_size = (bs,n_channels,img_size[0],img_size[1],img_size[2])
-    global trace_file_prefix
-    trace_file_prefix = f"bs{bs}_ch{n_channels}_img{img_size[0]}_patch{patch_size[0]}"
 
     print_rank_0(f"\n\n\n\n<------------------------ Result ------------------------->")
     print_rank_0(f"world_size: {world_size}")
     print_rank_0(f"pyscript arguments: {vars(args)}")
     print_rank_0(f"data size: {data_size}")
-    print_rank_0(f"trace_file_prefix: {trace_file_prefix}")
     print(f"RANK INFO: {rank}")
 
     ## Init Model
@@ -222,10 +244,13 @@ def main(args):
         train_epoch(epoch, data_size, model, optimizer, loss_funcs, samples_per_secs, tflops_lst, prof)
 
     ## Log
-    avg_samples_per_sec = sum(samples_per_secs[1:]) / len(samples_per_secs[1:])
     max_memory_used = torch.cuda.max_memory_allocated() / (1024**3)
+    avg_samples_per_sec = sum(samples_per_secs[1:]) / len(samples_per_secs[1:])
     avg_tflops = sum(tflops_lst[1:]) / len(tflops_lst[1:])
-    result = {"avg_samples_per_sec (per GPU)": avg_samples_per_sec, "max_memory (GiB)": max_memory_used, "avg TFlops (per GPU)": avg_tflops}
+    result = {"avg_samples_per_sec (per GPU)": avg_samples_per_sec, 
+              "max_memory (GiB)": max_memory_used, 
+              "avg TFlops (per GPU)": avg_tflops,
+              "Params (M)": n_parameters // 1_000_000}
     if args.use_wandb and rank==0:
         wandb.log(result)
     print_rank_0(result)
@@ -236,10 +261,10 @@ if __name__ == "__main__":
 
     if args.use_wandb and rank==0:
         import wandb
-        if args.run_name:
-            wandb.init(project="3dvit", name=args.run_name)
+        if args.wandb_name:
+            wandb.init(project="3dvit", name=args.wandb_name, config=vars(args))
         else:
-            wandb.init(project="3dvit")
+            wandb.init(project="3dvit", config=vars(args))
 
     torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=world_size, rank=rank)
     torch.distributed.barrier()

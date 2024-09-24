@@ -19,7 +19,7 @@ BS=${BS:-4}
 NNODES=$(wc -l < $PBS_NODEFILE)
 SEQ_LEN=$((($IMG_DIM / $PATCH_DIM) ** 3)) ## assuming cubic img and patch dim
 DIR=$(dirname $0)
-LOGNAME="h${H_DIM}_ffn${FFN_SIZE}_img${IMG_DIM}_patch${PATCH_DIM}_bs${BS}"
+LOGNAME="${NNODES}node_h${H_DIM}_ffn${FFN_SIZE}_img${IMG_DIM}_patch${PATCH_DIM}_bs${BS}"
 PBS_O_WORKDIR="$DIR/${NNODES}_node/$LOGNAME" ##Q. Why does everybody use PBS_O_WORKDIR?
 MONAI_DIR=$(dirname $DIR)/MONAI
 
@@ -31,7 +31,7 @@ echo -e "Training with Hyper-parameters:
     PATCH_DIM=$PATCH_DIM
     BS=$BS
     CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-'all'}
-Output Log and Trace File at: $PBS_O_WORKDIR \n"
+Output Log and Trace File at: $PBS_O_WORKDIR/output.log \n"
 mkdir -p $PBS_O_WORKDIR
 exec &> $PBS_O_WORKDIR/output.log
 
@@ -96,9 +96,6 @@ ulimit -s unlimited
 # NTOTRANKS=1
 
 ## PYSCRIPT ARGS
-if [ -n WANDB ]; then
-    WANDB="--use_wandb"
-fi
 VIT_ARGS="\
     --h_dim ${H_DIM}\
     --ffn_size ${FFN_SIZE}\
@@ -106,11 +103,17 @@ VIT_ARGS="\
     --patch_dim ${PATCH_DIM}\
     --bs ${BS}\
     --run_name $LOGNAME\
-    $WANDB \
 "
 
+if [ -n $WANDB ]; then
+    VIT_ARGS="--use_wandb $VIT_ARGS"
+fi
+
+NSYS_ARGS="--env TMPDIR=/home/eku/ --cpu-bind=numa nsys profile -o ${PBS_O_WORKDIR}/nsys/ --stats=true --show-output=true"
+
 ## RUN CMD
-run_cmd="mpiexec -n $NTOTRANKS -ppn $NRANKS_PER_NODE python ../../pp_test.py $VIT_ARGS"
+run_cmd="mpiexec -n $NTOTRANKS -ppn $NRANKS_PER_NODE $NSYS_ARGS python ../../pp_test.py $VIT_ARGS"
+# $NRANKS_PER_NODE run_cmd="mpiexec -n $NTOTRANKS -ppn $NSYS_ARGS python ../../pp_test.py $VIT_ARGS"
 echo "Executing command: $run_cmd"
 printf "\n\n\n\n<------------------------ Train Script Log ------------------------->"
 cd $PBS_O_WORKDIR
