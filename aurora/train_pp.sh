@@ -25,9 +25,7 @@ echo "BS: $BS"
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 NNODES=$(wc -l < $PBS_NODEFILE)
 SEQ_LEN=$((($IMG_DIM / $PATCH_DIM) ** 3)) ## assuming cubic img and patch dim
-#HERE=$(python3 -c 'import os; print(os.getcwd())') && export HERE
-#echo "HERE: $HERE"
-#echo "PWD: $PWD"
+
 LOGNAME="h${H_DIM}_ffn${FFN_SIZE}_img${IMG_DIM}_patch${PATCH_DIM}_bs${BS}_$(date +"%Y-%m-%d-%H-%M-%S")"
 PBS_O_WORKDIR="$SCRIPT_DIR/${NNODES}_node/$LOGNAME" ##Q. Why does everybody use PBS_O_WORKDIR?
 MONAI_DIR=$(realpath $(dirname $SCRIPT_DIR))/MONAI #$(dirname $DIR)/MONAI
@@ -48,24 +46,10 @@ exec &> $PBS_O_WORKDIR/output.log
 
 ## Curious to know more about these:
 export PYTHONPATH="$MONAI_DIR:$PYTHONPATH"
-#export CUDNN_PATH=/soft/libraries/cudnn/cudnn-cuda12-linux-x64-v9.1.0.70/
-#export CPATH=$CUDNN_PATH/include:$CPATH
-#export CC=gcc-12
-#export CXX=g++-12
-#export NCCL_CROSS_NIC=1 
-#export NCCL_COLLNET_ENABLE=1 
-#export NCCL_NET="AWS Libfabric"
-#export LD_LIBRARY_PATH=/soft/libraries/aws-ofi-nccl/v1.9.1-aws/lib:$LD_LIBRARY_PATH 
-#export LD_LIBRARY_PATH=/soft/libraries/hwloc/lib/:$LD_LIBRARY_PATH 
 export FI_CXI_DISABLE_HOST_REGISTER=1 
 export FI_MR_CACHE_MONITOR=userfaultfd 
 export FI_CXI_DEFAULT_CQ_SIZE=131072
 
-## Proxy
-#export HTTP_PROXY=http://proxy.alcf.anl.gov:3128
-#export HTTPS_PROXY=http://proxy.alcf.anl.gov:3130
-#export http_proxy=http://proxy.alcf.anl.gov:3128
-#export https_proxy=http://proxy.alcf.anl.gov:3128
 
 git config --global http.proxy http://proxy.alcf.anl.gov:3128
 echo "Set HTTP_PROXY and to $HTTP_PROXY"
@@ -113,7 +97,7 @@ VIT_ARGS="\
 "
 
 ## RUN CMD
-run_cmd="mpiexec -n $NTOTRANKS -ppn $NRANKS_PER_NODE python ../../pp_test.py $VIT_ARGS"
+run_cmd="mpiexec -n $NTOTRANKS -ppn $NRANKS_PER_NODE python $SCRIPT_DIR/pp_test.py $VIT_ARGS"
 echo "Executing command: $run_cmd"
 printf "\n\n\n\n"
 echo "<------------------------ Train Script Log ------------------------->"
